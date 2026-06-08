@@ -1,0 +1,14 @@
+Package: framecheck
+Title: Lightweight Data Frame Validation
+Version: 0.0.0.9000
+Authors@R:
+    person("Workshop", "Author", email = "author@example.com", role = c("aut", "cre"))
+Description: Contract-style checks for data frames that return a structured
+    report of what passed and failed instead of stopping at the first error.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
