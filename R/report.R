@@ -1,4 +1,5 @@
 #' @export
+#' @importFrom cli cli_h1 cli_alert_success cli_alert_danger
 print.framecheck_report <- function(x, ...) {
   cli::cli_h1("framecheck report")
   for (r in x$results) {
