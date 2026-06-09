@@ -84,6 +84,7 @@ chk_in_range <- function(col, min, max, n_show = 5L) {
   function(data) {
     x <- data[[col]]
     in_bounds <- x >= min & x <= max
+    n_na <- sum(is.na(x))
     bad_vals <- sort(unique(x[!in_bounds & !is.na(x)]))
     detail <- if (length(bad_vals)) {
       shown <- bad_vals[seq_len(min(n_show, length(bad_vals)))]
@@ -103,9 +104,7 @@ chk_in_range <- function(col, min, max, n_show = 5L) {
     }
     framecheck_result(
       check = paste0("in_range(", col, ")"),
-      # BUG (planted): na.rm = TRUE means an all-NA column reduces to
-      # all(logical(0)) == TRUE, so a column of missing values silently PASSES.
-      ok = all(in_bounds, na.rm = TRUE),
+      ok = n_na == 0 && all(in_bounds, na.rm = TRUE),
       n_fail = sum(!in_bounds, na.rm = TRUE),
       detail = detail
     )
