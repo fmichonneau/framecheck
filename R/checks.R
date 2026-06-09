@@ -25,7 +25,11 @@ chk_has_columns <- function(cols) {
       check = "has_columns",
       ok = length(missing) == 0,
       n_fail = length(missing),
-      detail = if (length(missing)) paste0("missing: ", paste(missing, collapse = ", ")) else ""
+      detail = if (length(missing)) {
+        paste0("missing: ", paste(missing, collapse = ", "))
+      } else {
+        ""
+      }
     )
   }
 }
@@ -43,7 +47,11 @@ chk_col_type <- function(col, type) {
       check = paste0("col_type(", col, ")"),
       ok = actual == type,
       n_fail = as.integer(actual != type),
-      detail = if (actual != type) paste0("expected ", type, ", got ", actual) else ""
+      detail = if (actual != type) {
+        paste0("expected ", type, ", got ", actual)
+      } else {
+        ""
+      }
     )
   }
 }
@@ -69,19 +77,37 @@ chk_unique_key <- function(cols) {
 #'
 #' @param col Column name.
 #' @param min,max Inclusive bounds.
+#' @param n_show Maximum number of distinct out-of-range values to show in the detail.
 #' @return A check function taking a data frame.
 #' @export
-chk_in_range <- function(col, min, max) {
+chk_in_range <- function(col, min, max, n_show = 5L) {
   function(data) {
     x <- data[[col]]
     in_bounds <- x >= min & x <= max
+    bad_vals <- sort(unique(x[!in_bounds & !is.na(x)]))
+    detail <- if (length(bad_vals)) {
+      shown <- bad_vals[seq_len(min(n_show, length(bad_vals)))]
+      extra <- length(bad_vals) - length(shown)
+      suffix <- if (extra > 0) paste0(" ... (", extra, " more)") else ""
+      paste0(
+        "out-of-range values [",
+        min,
+        ", ",
+        max,
+        "]: ",
+        paste(shown, collapse = ", "),
+        suffix
+      )
+    } else {
+      ""
+    }
     framecheck_result(
       check = paste0("in_range(", col, ")"),
       # BUG (planted): na.rm = TRUE means an all-NA column reduces to
       # all(logical(0)) == TRUE, so a column of missing values silently PASSES.
       ok = all(in_bounds, na.rm = TRUE),
       n_fail = sum(!in_bounds, na.rm = TRUE),
-      detail = ""
+      detail = detail
     )
   }
 }

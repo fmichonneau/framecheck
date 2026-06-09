@@ -4,12 +4,14 @@
 \alias{chk_in_range}
 \title{Check that a numeric column falls within a range}
 \usage{
-chk_in_range(col, min, max)
+chk_in_range(col, min, max, n_show = 5L)
 }
 \arguments{
 \item{col}{Column name.}
 
 \item{min, max}{Inclusive bounds.}
+
+\item{n_show}{Maximum number of distinct out-of-range values to show in the detail.}
 }
 \value{
 A check function taking a data frame.
