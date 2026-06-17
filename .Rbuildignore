@@ -2,3 +2,4 @@
 ^.vscode/
 ^README\.Rmd$
 ^\.github$
+^docs/

@@ -1,0 +1,219 @@
+---
+title: "Building, Debugging, Testing & Publishing R Packages"
+subtitle: "A live walkthrough"
+author: François Michonneau
+date: 2024-06-09
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    incremental: false
+    code-line-numbers: true
+    highlight-style: github
+---
+
+## Why this session {.smaller}
+
+- If you already write R code, you know *what* a package is.
+- To share your code, you need to know *how* to make a package.
+- To make your package robust, you need to learn how to debug, test, and publish it.
+- Format: **watch-along**. Repo + slides shared afterward.
+- We work one small package end-to-end: **framecheck** (data validation).
+
+## The big picture {.smaller}
+
+Steps to update code in a package:
+
+::: {.r-fit-text}
+**Make a change → Prove it's correct → Ship it safely**
+:::
+
+| Step | What it means | Today's segments |
+|---|---|---|
+| Make a change | write code, manage deps | **Build** (1–2) |
+| Prove it's correct | find & lock down behavior | **Debug** + **Test** (3–4) |
+| Ship it safely | release to your users | **Publish** (5) |
+
+These steps spin the **development loop** we repeat:
+
+> edit code → `load_all()` → `document()` → `test()` → `check()`
+
+# 1 · Orientation & internals {background-color="#1b4965"}
+
+## The tooling {.smaller}
+
+R packages used to build packages:
+
+- **devtools**: the Swiss Army knife for package development
+- **usethis**: automates common package development tasks
+- **roxygen2**: write documentation inline with code, generate help files
+- **testthat**: framework for writing and running tests
+
+## Anatomy of a package {.smaller}
+
+- **DESCRIPTION** — metadata (what the package does, author, version, dependencies)
+- **NAMESPACE** — functions available to the users (generated automatically from roxygen2)
+- **R/** — your functions (the code)
+- **man/** — the help files (generated automatically from roxygen2)
+- **tests/** — test files to validate the behavior of your code (using testthat)
+
+## The development loop {.smaller}
+
+Edit the code → `load_all()` → try it out → `document()` → `test()` → `check()`
+
+* `load_all()` simulates installing the package without actually installing it, so you can test changes quickly.
+* `document()` regenerates the documentation and NAMESPACE based on your code comments.
+* `test()` runs your tests to check your code works as expected.
+* `check()` runs a comprehensive set of checks to ensure the architecture of your package is correct (and optionally meets CRAN standards).
+
+## Positron makes this easier {.smaller}
+
+- Build / package actions + command palette (no typing `load_all`)
+- Integrated R console + terminal
+- Jump-to-definition across the package
+
+
+# 2 · Building {background-color="#1b4965"}
+
+## Dependency hygiene {.smaller}
+
+- use `load_all()` (and not `install()` during development)
+- `usethis::use_package()` to declare dependencies
+- **Imports** (needed at run time) vs **Suggests** (tests/examples)
+- `::` and `@importFrom` for explicit namespace management
+
+## roxygen2 round-trip {.smaller}
+
+- Edit the function documentation → `document()` → `man/` + `NAMESPACE` regenerate.
+- Preview help files with `?my_function` or `help("my_function")`
+- use `@export` to make a function available to users
+
+*Demo:* fix framecheck's missing `cli` declaration, re-document, re-check.
+
+# 3 · Debugging {background-color="#5fa8d3"}
+
+## The bug {.smaller}
+
+`framecheck` reports an **all-NA column as PASSING** a range check.
+A real-world "my data was empty but everything looked green" failure.
+
+## Escalation ladder {.smaller}
+
+- `traceback()` to see where the error occurred
+- `print`/`cli` leave breadcrumbs by making your function tell you where it is at
+- `debug()` / `debugonce()` to step through a function line by line on the next call
+- `browser()` interactive breakpoint so you can inspect the environment at that moment
+- `options(error = recover)` to drop into the environment of any error, even in tests
+
+## Positron's debugger (the centerpiece) {.smaller}
+
+- Set **breakpoints in the gutter**
+- Step over / into / out
+- Inspect the **call stack + variables** mid-execution
+- Conditional breakpoints; evaluate in the debug console
+
+## Discipline {.smaller}
+
+> A bug you fix without a test will come back.
+
+# 4 · Testing {background-color="#5fa8d3"}
+
+## testthat {.smaller}
+
+- `test_that()` uses expectations (`expect_true`, `expect_equal`, `expect_error`, ... )
+- Turn the bug into a **regression test** first — watch it fail, then fix
+- Cover what breaks: `NA`, empty, wrong type
+- **Snapshot tests** for cli/message output
+- `withr` for clean setup/teardown
+
+## Positron makes this easier {.smaller}
+
+- Test Explorer: run/filter individual tests, inline pass/fail
+- Run tests on save
+- `devtools::check()` — the all-in-one gate
+
+# 5 · Publishing: CI/CD + PPM {background-color="#1b4965"}
+
+## Checks gate the merge {.smaller}
+
+- `usethis::use_github_action("check-standard")`
+- r-lib actions: matrix across OS × R versions
+- Required status checks on PRs — **nobody merges red**
+
+## PPM: how it's wired up {.smaller}
+
+Three building blocks: **source** → **repository** → **URL**
+
+```bash
+# 1. A source = where packages come from (git OR local)
+rspm create source --name=internal-src --type=git   # or --type=local
+# 2. A repository = a served collection
+rspm create repo   --name=internal
+# 3. Subscribe the repo to the source
+rspm subscribe --repo=internal --source=internal-src
+```
+
+Users then point R at the repo URL:
+
+```r
+options(repos = c(INTERNAL = "https://ppm.example.com/internal/latest"))
+install.packages("framecheck")
+```
+
+## Two ways to publish to PPM {.smaller}
+
+| | **Push** — local source | **Pull** — git source |
+|---|---|---|
+| Trigger | CI calls PPM **after checks pass** | PPM **polls** the repo |
+| Mechanism | `R CMD build` → upload `.tar.gz` via `rspm add` / PPM API | `git-builder` builds from a branch/tag |
+| Who builds | **CI** (exact checked artifact is served) | **PPM** (rebuilds from source) |
+| Gate | only build+upload when green | only **merge/tag** when green |
+| Needs | CI → PPM credentials | PPM build env has the deps |
+
+- **Push** = imperative, green checks. **Pull** = declarative, git is the trigger.
+- Either way, **successful checks are the gate**
+
+## Staging → production {.smaller}
+
+The same split works with **either** path:
+
+| Stage | Git path: builder watches | Push path: CI publishes to | Audience |
+|---|---|---|---|
+| **staging** | the `main` **branch** | a `dev` local source | early adopters |
+| **production** | git **tags** (`v0.1.0`) | a `prod` local source | everyone |
+
+- A tag (or a green release build) = the promotion trigger
+- Snapshots / repository versioning for reproducibility
+
+## Versioning {.smaller}
+
+- Bump in DESCRIPTION: `usethis::use_version()`
+- Dev vs release: `0.1.0.9000` vs `0.1.0`
+- Tag the release → prod builder picks it up
+
+## CRAN (for the packages that go public) {.smaller}
+
+- Same `R CMD check` discipline **is** the CRAN bar
+- `R CMD check --as-cran`, `urlchecker::url_check()`
+- CRAN policies + `cran-comments.md` — not a full submission today
+
+## The Python parallel {.smaller}
+
+Same discipline, different tools:
+
+| R | Python |
+|---|---|
+| devtools / usethis | uv / hatch / setuptools |
+| roxygen2 | docstrings + Sphinx |
+| testthat | pytest |
+| `R CMD check` | ruff + `python -m build` |
+| PPM `git` source | PPM `git-python` source |
+| CRAN | PyPI |
+
+## Takeaways {.smaller}
+
+- Same arc, every time: **make a change → prove it's correct → ship it safely**
+- The dev loop is muscle memory: `load_all → document → test → check`
+- Every fix earns a test
+- For internal packages, CI gates the merge; tags promote to prod via PPM
+- These are habits that work in every programming language: write the test, run the check, gate the merge
